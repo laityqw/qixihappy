@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>七夕快乐</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: radial-gradient(ellipse at center, #0a0a18 0%, #020208 100%);
+    overflow: hidden;
+    font-family: 'STSong','SimSun','Songti SC','KaiTi',serif;
+    cursor: default;
+    user-select: none; -webkit-user-select: none;
+    height: 100vh; width: 100vw;
+  }
+  canvas { display:block; position:fixed; top:0; left:0; }
+  .overlay {
+    position:fixed; top:0; left:0; right:0; bottom:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    pointer-events:none; z-index:10;
+  }
+  .title {
+    font-size:clamp(2.5rem,7vw,5rem); font-weight:bold;
+    background:linear-gradient(135deg,#ff4088,#e040fb,#ff80ab,#ea80fc,#ff4088);
+    background-size:400% 400%;
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent;
+    animation:gradientShift 4s ease-in-out infinite;
+    letter-spacing:0.2em;
+    filter:drop-shadow(0 0 50px rgba(255,64,136,0.6)) drop-shadow(0 0 100px rgba(224,64,251,0.4));
+    margin-bottom:0.3em;
+  }
+  .subtitle {
+    font-size:clamp(1rem,2.5vw,1.5rem);
+    color:rgba(255,180,210,0.9);
+    letter-spacing:0.4em;
+    animation:fadeInOut 3s ease-in-out infinite;
+    text-shadow:0 0 30px rgba(255,130,180,0.6),0 0 60px rgba(200,100,200,0.3);
+  }
+  
+  @keyframes gradientShift {
+    0%,100%{background-position:0% 50%}
+    50%{background-position:100% 50%}
+  }
+  @keyframes fadeInOut {
+    0%,100%{opacity:0.5}
+    50%{opacity:1}
+  }
+  .spark {
+    position:fixed; pointer-events:none; z-index:100;
+    animation:sparkFly 1s ease-out forwards;
+  }
+  @keyframes sparkFly {
+    0%{opacity:1;transform:translate(0,0) scale(1)}
+    100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(0)}
+  }
+</style>
+</head>
+<body>
+
+<div class="overlay">
+  <div class="title">七夕快乐</div>
+  <div class="subtitle">愿得一心人 · 白首不相离</div>
+</div>
+
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ═══════════════════════════════════════
+// Scene
+// ═══════════════════════════════════════
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x030310, 0.00012);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 0.1, 7);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.toneMappingExposure = 1.3;
+document.body.appendChild(renderer.domElement);
+
+// ═══════════════════════════════════════
+// Post Processing
+// ═══════════════════════════════════════
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.5, 0.8);
+composer.addPass(bloomPass);
+
+// ═══════════════════════════════════════
+// Textures
+// ═══════════════════════════════════════
+function createHeartTex(size) {
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  const s = size, cx = s/2, cy = s/2;
+  const sc = s * 0.028;
+
+  // Heart path
+  ctx.beginPath();
+  for (let i = 0; i <= 200; i++) {
+    const t = (i/200) * Math.PI * 2;
+    const x = 16 * Math.pow(Math.sin(t), 3);
+    const y = -(13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t));
+    i === 0 ? ctx.moveTo(cx + x*sc, cy + y*sc) : ctx.lineTo(cx + x*sc, cy + y*sc);
+  }
+  ctx.closePath();
+
+  // Outer glow
+  ctx.shadowColor = 'rgba(255,50,130,0.7)'; ctx.shadowBlur = s * 0.25;
+  const g1 = ctx.createRadialGradient(cx, cy-s*0.05, s*0.03, cx, cy, s*0.46);
+  g1.addColorStop(0, 'rgba(255,255,255,1)');
+  g1.addColorStop(0.15, 'rgba(255,180,220,0.95)');
+  g1.addColorStop(0.4, 'rgba(255,70,140,0.5)');
+  g1.addColorStop(0.7, 'rgba(200,30,110,0.12)');
+  g1.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g1; ctx.fill();
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+  // Inner bright core
+  const g2 = ctx.createRadialGradient(cx, cy-s*0.08, 0, cx, cy, s*0.22);
+  g2.addColorStop(0, 'rgba(255,255,255,1)');
+  g2.addColorStop(0.25, 'rgba(255,210,235,0.85)');
+  g2.addColorStop(0.6, 'rgba(255,90,155,0.18)');
+  g2.addColorStop(1, 'rgba(255,40,100,0)');
+  ctx.fillStyle = g2; ctx.fill();
+
+  return new THREE.CanvasTexture(c);
+}
+
+function createGlowTex(size) {
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  const h = size/2;
+  const g = ctx.createRadialGradient(h, h, 0, h, h, h);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.06, 'rgba(255,255,255,1)');
+  g.addColorStop(0.18, 'rgba(255,180,220,0.7)');
+  g.addColorStop(0.4, 'rgba(255,70,140,0.22)');
+  g.addColorStop(0.7, 'rgba(180,30,100,0.04)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
+
+const heartTex = createHeartTex(128);
+const heartTexS = createHeartTex(64);
+const glowTex = createGlowTex(128);
+const glowTexS = createGlowTex(64);
+
+// Petal texture
+function createPetalTex(size) {
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  const s = size, cx = s/2, cy = s/2;
+  // Draw a petal shape (ellipse) - wider and more visible
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, s*0.3, s*0.45, 0, 0, Math.PI*2);
+  ctx.closePath();
+  const g = ctx.createRadialGradient(cx, cy-s*0.05, 0, cx, cy, s*0.48);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.15, 'rgba(255,200,230,0.9)');
+  g.addColorStop(0.4, 'rgba(255,130,180,0.5)');
+  g.addColorStop(0.7, 'rgba(220,60,130,0.12)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fill();
+  ctx.restore();
+  return new THREE.CanvasTexture(c);
+}
+const petalTex = createPetalTex(128);
+
+// ═══════════════════════════════════════
+// 3D Heart - 2D parametric equation extruded into 3D
+// ═══════════════════════════════════════
+function heartXY(t) {
+  // 2D heart parametric equation
+  const x = 16 * Math.pow(Math.sin(t), 3);
+  const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+  return [x, y];
+}
+
+// Sample surface points: 2D heart outline, extruded into 3D with rounded depth
+function sampleHeart(count, maxDepth, scale) {
+  const pos = [], col = [];
+  const outlineSteps = 400;
+
+  // First, generate the 2D outline points
+  const outline = [];
+  for (let i = 0; i < outlineSteps; i++) {
+    const t = (i / outlineSteps) * Math.PI * 2;
+    const [x, y] = heartXY(t);
+    outline.push({ x, y });
+  }
+
+  // Generate surface points
+  for (let i = 0; i < count; i++) {
+    // Pick a random point on the outline
+    const o = outline[Math.floor(Math.random() * outlineSteps)];
+
+    // Z depth: varies based on position on the heart
+    // Wider at the top (two lobes), narrower at the bottom
+    const xNorm = Math.abs(o.x) / 16;
+    const yNorm = (o.y + 17) / 34; // 0 at bottom, 1 at top
+    const actualMaxDepth = maxDepth * (0.5 + xNorm * 0.5) * (0.6 + yNorm * 0.4);
+
+    // Random Z within the depth range
+    const z = (Math.random() - 0.5) * 2 * actualMaxDepth;
+
+    // Scale the outline point
+    const sx = o.x * scale * 0.0625; // 1/16 to normalize
+    const sy = o.y * scale * 0.0588; // 1/17 to normalize
+    const sz = z * scale * 0.0625;
+
+    pos.push(sx, sy, sz);
+
+    const mix = (o.y + 17) / 34;
+    col.push(1, 0.12 + mix * 0.22, 0.28 + mix * 0.52);
+  }
+
+  return { pos: new Float32Array(pos), col: new Float32Array(col), n: pos.length / 3 };
+}
+
+// Volume fill: points inside the 2D heart outline, extruded into 3D
+function sampleHeartVolume(count, scale) {
+  const pos = [], col = [];
+
+  // Pre-generate the outline for inside/outside testing
+  const outlineSteps = 200;
+  const outline = [];
+  for (let i = 0; i < outlineSteps; i++) {
+    const t = (i / outlineSteps) * Math.PI * 2;
+    const [x, y] = heartXY(t);
+    outline.push({ x, y });
+  }
+
+  // Check if a point is inside the 2D heart outline
+  function isInsideHeart(px, py) {
+    // Ray casting: count intersections
+    let inside = false;
+    for (let i = 0, j = outlineSteps - 1; i < outlineSteps; j = i++) {
+      const xi = outline[i].x, yi = outline[i].y;
+      const xj = outline[j].x, yj = outline[j].y;
+      if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  let att = 0, maxAtt = count * 20;
+  while (pos.length < count * 3 && att < maxAtt) {
+    att++;
+    const px = (Math.random() - 0.5) * 2 * 16;
+    const py = (Math.random() - 0.5) * 2 * 17;
+
+    if (!isInsideHeart(px * 0.85, py * 0.85)) continue;
+
+    // Z depth at this point
+    const xNorm = Math.abs(px) / 16;
+    const maxDepth = 0.8 * (0.5 + xNorm * 0.5);
+    const z = (Math.random() - 0.5) * 2 * maxDepth;
+
+    const sx = px * scale * 0.0625;
+    const sy = py * scale * 0.0588;
+    const sz = z * scale * 0.0625;
+
+    pos.push(sx, sy, sz);
+    const d = Math.abs(z) / maxDepth;
+    col.push(0.85 - d * 0.15, 0.04 + d * 0.1, 0.12 + d * 0.15);
+  }
+
+  return { pos: new Float32Array(pos), col: new Float32Array(col), n: pos.length / 3 };
+}
+
+// ═══════════════════════════════════════
+// Heart Group
+// ═══════════════════════════════════════
+const heartGroup = new THREE.Group();
+scene.add(heartGroup);
+
+// Surface shell
+const surf = sampleHeart(7000, 0.7, 1.6);
+const surfGeo = new THREE.BufferGeometry();
+surfGeo.setAttribute('position', new THREE.BufferAttribute(surf.pos, 3));
+surfGeo.setAttribute('color', new THREE.BufferAttribute(surf.col, 3));
+const surfMat = new THREE.PointsMaterial({
+  size: 0.07, map: heartTex, blending: THREE.AdditiveBlending,
+  depthWrite: false, vertexColors: true, transparent: true, opacity: 0.9
+});
+const surfPts = new THREE.Points(surfGeo, surfMat);
+heartGroup.add(surfPts);
+
+// Volume fill
+const vol = sampleHeartVolume(3000, 1.6);
+const volGeo = new THREE.BufferGeometry();
+volGeo.setAttribute('position', new THREE.BufferAttribute(vol.pos, 3));
+volGeo.setAttribute('color', new THREE.BufferAttribute(vol.col, 3));
+const volMat = new THREE.PointsMaterial({
+  size: 0.06, map: heartTexS, blending: THREE.AdditiveBlending,
+  depthWrite: false, vertexColors: true, transparent: true, opacity: 0.45
+});
+const volPts = new THREE.Points(volGeo, volMat);
+heartGroup.add(volPts);
+
+// ═══════════════════════════════════════
+// Flow Shells - rotating at different speeds for flow illusion
+// ═══════════════════════════════════════
+const flowShells = [];
+const shellCount = 5;
+for (let si = 0; si < shellCount; si++) {
+  const depth = 0.5 + si * 0.15;
+  const scale = 1.6 + si * 0.04;
+  const data = sampleHeart(1200, depth, scale);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(data.pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(data.col, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 0.04 + si * 0.008,
+    map: si < 2 ? heartTexS : glowTexS,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false, vertexColors: true, transparent: true,
+    opacity: 0.25 + si * 0.06
+  });
+  const pts = new THREE.Points(geo, mat);
+  heartGroup.add(pts);
+  flowShells.push({ pts, speed: 0.001 + si * 0.0005, axis: si % 2 === 0 ? 'y' : 'x' });
+}
+
+// Outer aura shell
+const aura = sampleHeart(1500, 1.0, 1.75);
+const auraGeo = new THREE.BufferGeometry();
+auraGeo.setAttribute('position', new THREE.BufferAttribute(aura.pos, 3));
+const auraMat = new THREE.PointsMaterial({
+  size: 0.08, map: glowTexS, blending: THREE.AdditiveBlending,
+  depthWrite: false, color: new THREE.Color(1, 0.35, 0.6), transparent: true, opacity: 0.25
+});
+const auraPts = new THREE.Points(auraGeo, auraMat);
+heartGroup.add(auraPts);
+
+// ═══════════════════════════════════════
+// Energy Pulse Rings
+// ═══════════════════════════════════════
+const pulses = [];
+const maxPulses = 4;
+
+function spawnPulse() {
+  const count = 300;
+  const pos = new Float32Array(count * 3);
+  const radius = 1.2;
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const r = radius + (Math.random() - 0.5) * 0.2;
+    const y = (Math.random() - 0.5) * 1.5;
+    pos[i * 3] = Math.cos(angle) * r;
+    pos[i * 3 + 1] = y;
+    pos[i * 3 + 2] = Math.sin(angle) * r;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 0.06, map: glowTexS, blending: THREE.AdditiveBlending,
+    depthWrite: false, color: new THREE.Color(1, 0.4, 0.65), transparent: true, opacity: 0.7
+  });
+  const ring = new THREE.Points(geo, mat);
+  heartGroup.add(ring);
+  return { ring, life: 2.5, age: 0, mat };
+}
+
+// ═══════════════════════════════════════
+// Background Stars (dense)
+// ═══════════════════════════════════════
+const bgStars = [];
+const starGroup = new THREE.Group();
+scene.add(starGroup);
+
+// Dense star sphere
+const starCount = 1000;
+const starPos = new Float32Array(starCount * 3);
+const starCol = new Float32Array(starCount * 3);
+for (let i = 0; i < starCount; i++) {
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos(2 * Math.random() - 1);
+  const r = 8 + Math.random() * 18;
+  starPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+  starPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+  starPos[i*3+2] = r * Math.cos(phi);
+  const b = 0.25 + Math.random() * 0.75;
+  starCol[i*3] = b; starCol[i*3+1] = b * 0.7; starCol[i*3+2] = b * 0.85;
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+starGeo.setAttribute('color', new THREE.BufferAttribute(starCol, 3));
+const starMat = new THREE.PointsMaterial({
+  size: 0.035, map: glowTexS, blending: THREE.AdditiveBlending,
+  depthWrite: false, vertexColors: true, transparent: true, opacity: 0.75
+});
+starGroup.add(new THREE.Points(starGeo, starMat));
+
+// Twinkling stars
+const twCount = 300;
+const twPos = new Float32Array(twCount * 3);
+const twData = [];
+for (let i = 0; i < twCount; i++) {
+  twPos[i*3] = (Math.random()-0.5)*22;
+  twPos[i*3+1] = (Math.random()-0.5)*22;
+  twPos[i*3+2] = -5 - Math.random()*12;
+  twData.push({ phase: Math.random()*Math.PI*2, speed: 0.5+Math.random()*2.5 });
+}
+const twGeo = new THREE.BufferGeometry();
+twGeo.setAttribute('position', new THREE.BufferAttribute(twPos, 3));
+const twMat = new THREE.PointsMaterial({
+  size: 0.04, map: glowTex, blending: THREE.AdditiveBlending,
+  depthWrite: false, color: new THREE.Color(1, 0.85, 0.9), transparent: true, opacity: 0.7
+});
+const twPts = new THREE.Points(twGeo, twMat);
+scene.add(twPts);
+
+// ═══════════════════════════════════════
+// Full-Screen Floating Hearts
+// ═══════════════════════════════════════
+const floatCount = 500;
+const floatPos = new Float32Array(floatCount * 3);
+const floatCol = new Float32Array(floatCount * 3);
+const floatData = [];
+
+for (let i = 0; i < floatCount; i++) {
+  floatPos[i*3] = (Math.random()-0.5)*18;
+  floatPos[i*3+1] = (Math.random()-0.5)*16;
+  floatPos[i*3+2] = -2 - Math.random()*7;
+
+  const hue = 0.93 + Math.random()*0.07;
+  const c = new THREE.Color().setHSL(hue, 0.7+Math.random()*0.3, 0.45+Math.random()*0.45);
+  floatCol[i*3] = c.r; floatCol[i*3+1] = c.g; floatCol[i*3+2] = c.b;
+
+  floatData.push({
+    vy: 0.003+Math.random()*0.014,
+    vx: (Math.random()-0.5)*0.003,
+    vz: (Math.random()-0.5)*0.002,
+    swayPhase: Math.random()*Math.PI*2,
+    swaySpeed: 0.3+Math.random()*0.7,
+    swayAmp: 0.3+Math.random()*0.9,
+    opacityPhase: Math.random()*Math.PI*2,
+  });
+}
+const floatGeo = new THREE.BufferGeometry();
+floatGeo.setAttribute('position', new THREE.BufferAttribute(floatPos, 3));
+floatGeo.setAttribute('color', new THREE.BufferAttribute(floatCol, 3));
+const floatMat = new THREE.PointsMaterial({
+  size: 0.12, map: heartTex, blending: THREE.AdditiveBlending,
+  depthWrite: false, vertexColors: true, transparent: true, opacity: 0.55
+});
+const floatPts = new THREE.Points(floatGeo, floatMat);
+scene.add(floatPts);
+
+// Small floating hearts (background)
+const float2Count = 300;
+const float2Pos = new Float32Array(float2Count * 3);
+const float2Data = [];
+for (let i = 0; i < float2Count; i++) {
+  float2Pos[i*3] = (Math.random()-0.5)*22;
+  float2Pos[i*3+1] = (Math.random()-0.5)*18;
+  float2Pos[i*3+2] = -5 - Math.random()*9;
+  float2Data.push({
+    vy: 0.002+Math.random()*0.007,
+    vx: (Math.random()-0.5)*0.002,
+    swayPhase: Math.random()*Math.PI*2,
+    swaySpeed: 0.2+Math.random()*0.5,
+    swayAmp: 0.2+Math.random()*0.6,
+  });
+}
+const float2Geo = new THREE.BufferGeometry();
+float2Geo.setAttribute('position', new THREE.BufferAttribute(float2Pos, 3));
+const float2Mat = new THREE.PointsMaterial({
+  size: 0.07, map: heartTexS, blending: THREE.AdditiveBlending,
+  depthWrite: false, color: new THREE.Color(1, 0.4, 0.6), transparent: true, opacity: 0.28
+});
+const float2Pts = new THREE.Points(float2Geo, float2Mat);
+scene.add(float2Pts);
+
+// ═══════════════════════════════════════
+// Scattered Light Particles
+// ═══════════════════════════════════════
+const litCount = 250;
+const litPos = new Float32Array(litCount * 3);
+const litData = [];
+for (let i = 0; i < litCount; i++) {
+  litPos[i*3] = (Math.random()-0.5)*10;
+  litPos[i*3+1] = (Math.random()-0.5)*10;
+  litPos[i*3+2] = (Math.random()-0.5)*5;
+  litData.push({
+    vy: 0.001+Math.random()*0.005,
+    vx: (Math.random()-0.5)*0.002,
+    phase: Math.random()*Math.PI*2,
+  });
+}
+const litGeo = new THREE.BufferGeometry();
+litGeo.setAttribute('position', new THREE.BufferAttribute(litPos, 3));
+const litMat = new THREE.PointsMaterial({
+  size: 0.06, map: glowTexS, blending: THREE.AdditiveBlending,
+  depthWrite: false, color: new THREE.Color(1, 0.5, 0.7), transparent: true, opacity: 0.4
+});
+const litPts = new THREE.Points(litGeo, litMat);
+scene.add(litPts);
+
+// ═══════════════════════════════════════
+// Falling Petals
+// ═══════════════════════════════════════
+const petalCount = 400;
+const petalPos = new Float32Array(petalCount * 3);
+const petalData = [];
+
+for (let i = 0; i < petalCount; i++) {
+  petalPos[i * 3] = (Math.random() - 0.5) * 16;
+  petalPos[i * 3 + 1] = (Math.random() - 0.5) * 14;
+  petalPos[i * 3 + 2] = -1 - Math.random() * 3;
+
+  petalData.push({
+    fallSpeed: 0.003 + Math.random() * 0.015,
+    swayPhase: Math.random() * Math.PI * 2,
+    swaySpeed: 0.3 + Math.random() * 0.8,
+    swayAmp: 0.5 + Math.random() * 1.5,
+    rotSpeed: (Math.random() - 0.5) * 0.03,
+    rotation: Math.random() * Math.PI * 2,
+    xDrift: (Math.random() - 0.5) * 0.002,
+    scale: 0.6 + Math.random() * 0.8,
+  });
+}
+
+const petalGeo = new THREE.BufferGeometry();
+petalGeo.setAttribute('position', new THREE.BufferAttribute(petalPos, 3));
+const petalMat = new THREE.PointsMaterial({
+  size: 0.3,
+  map: petalTex,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  color: new THREE.Color(1, 0.45, 0.65),
+  transparent: true,
+  opacity: 0.65,
+});
+const petalPts = new THREE.Points(petalGeo, petalMat);
+scene.add(petalPts);
+
+// Second layer of smaller petals (background)
+const petal2Count = 300;
+const petal2Pos = new Float32Array(petal2Count * 3);
+const petal2Data = [];
+
+for (let i = 0; i < petal2Count; i++) {
+  petal2Pos[i * 3] = (Math.random() - 0.5) * 20;
+  petal2Pos[i * 3 + 1] = (Math.random() - 0.5) * 16;
+  petal2Pos[i * 3 + 2] = -2 - Math.random() * 5;
+
+  petal2Data.push({
+    fallSpeed: 0.002 + Math.random() * 0.01,
+    swayPhase: Math.random() * Math.PI * 2,
+    swaySpeed: 0.2 + Math.random() * 0.6,
+    swayAmp: 0.3 + Math.random() * 1.2,
+    rotSpeed: (Math.random() - 0.5) * 0.02,
+    rotation: Math.random() * Math.PI * 2,
+    xDrift: (Math.random() - 0.5) * 0.0015,
+  });
+}
+const petal2Geo = new THREE.BufferGeometry();
+petal2Geo.setAttribute('position', new THREE.BufferAttribute(petal2Pos, 3));
+const petal2Mat = new THREE.PointsMaterial({
+  size: 0.2,
+  map: petalTex,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  color: new THREE.Color(1, 0.35, 0.55),
+  transparent: true,
+  opacity: 0.4,
+});
+const petal2Pts = new THREE.Points(petal2Geo, petal2Mat);
+scene.add(petal2Pts);
+
+// ═══════════════════════════════════════
+// Mouse
+// ═══════════════════════════════════════
+let mx = 0, my = 0, tmx = 0, tmy = 0;
+document.addEventListener('mousemove', e => {
+  tmx = (e.clientX/innerWidth)*2-1;
+  tmy = -(e.clientY/innerHeight)*2+1;
+});
+document.addEventListener('touchmove', e => {
+  tmx = (e.touches[0].clientX/innerWidth)*2-1;
+  tmy = -(e.touches[0].clientY/innerHeight)*2+1;
+}, { passive: true });
+
+// Click spark
+document.addEventListener('click', e => {
+  for (let i = 0; i < 16; i++) {
+    const s = document.createElement('div'); s.className = 'spark';
+    const a = (i/16)*Math.PI*2, d = 40+Math.random()*70;
+    s.style.cssText = `
+      left:${e.clientX}px; top:${e.clientY}px;
+      width:5px; height:5px; border-radius:50%;
+      background:hsl(${330+Math.random()*30},90%,${55+Math.random()*35}%);
+      box-shadow:0 0 14px hsl(${330+Math.random()*30},90%,60%);
+      --dx:${Math.cos(a)*d}px; --dy:${Math.sin(a)*d}px;
+    `;
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1000);
+  }
+});
+
+// ═══════════════════════════════════════
+// Animation
+// ═══════════════════════════════════════
+const clock = new THREE.Clock();
+let pulseTimer = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const t = performance.now() * 0.001;
+
+  mx += (tmx - mx) * 0.025;
+  my += (tmy - my) * 0.025;
+
+  // ── Heart Group ──
+  heartGroup.rotation.y += 0.0008;
+  heartGroup.rotation.y += mx * 0.0008;
+  heartGroup.rotation.x += (my * 0.3 - heartGroup.rotation.x) * 0.02;
+
+  // ── Slow Breathing ──
+  // ~4.5 second breath cycle, natural inhale/exhale feel
+  const breathCycle = t * 1.4; // 2π/1.4 ≈ 4.5s per full breath
+  const breath = Math.sin(breathCycle);
+  // Shaped: inhale takes ~40% of cycle, exhale ~60% (more natural)
+  const breathCurve = breath < 0
+    ? Math.pow(Math.abs(breath), 0.7) * (breath < 0 ? -1 : 1) // slower exhale
+    : breath; // natural inhale
+  const breatheBase = 1 + breathCurve * 0.04;
+  // Subtle secondary flutter
+  const breathe2 = 1 + Math.sin(t * 2.8) * 0.01;
+  heartGroup.scale.setScalar(breatheBase * breathe2);
+
+  // ── Bloom & Opacity breathing ──
+  const breathGlow = (breathCurve + 1) / 2; // 0 to 1 mapped
+  surfMat.opacity = 0.82 + breathCurve * 0.1;
+  volMat.opacity = 0.38 + breathCurve * 0.08;
+  auraMat.opacity = 0.18 + breathCurve * 0.06;
+  // Particle size breathes with the heart
+  surfMat.size = 0.07 + breathCurve * 0.008;
+  volMat.size = 0.06 + breathCurve * 0.006;
+
+  // ── Flow Shells ──
+  for (const shell of flowShells) {
+    if (shell.axis === 'y') shell.pts.rotation.y += shell.speed;
+    else shell.pts.rotation.x += shell.speed * 0.7;
+    shell.pts.rotation.z += shell.speed * 0.3;
+  }
+
+  // ── Pulse Rings ──
+  pulseTimer += dt;
+  if (pulseTimer > 2.5 && pulses.length < maxPulses) {
+    pulseTimer = 0;
+    pulses.push(spawnPulse());
+  }
+  for (let i = pulses.length-1; i >= 0; i--) {
+    const p = pulses[i];
+    p.age += dt;
+    const prog = p.age / p.life;
+    p.ring.scale.setScalar(1 + prog * 2.5);
+    p.mat.opacity = 0.7 * (1 - prog);
+    if (p.age >= p.life) {
+      heartGroup.remove(p.ring);
+      p.ring.geometry.dispose(); p.mat.dispose();
+      pulses.splice(i, 1);
+    }
+  }
+
+  // ── Floating Hearts ──
+  const fp = floatPts.geometry.attributes.position.array;
+  for (let i = 0; i < floatData.length; i++) {
+    const idx = i*3, d = floatData[i];
+    fp[idx+1] += d.vy;
+    fp[idx] += d.vx + Math.sin(t*d.swaySpeed+d.swayPhase)*d.swayAmp*0.005;
+    fp[idx+2] += d.vz;
+    if (fp[idx+1] > 9) { fp[idx+1] = -9; fp[idx] = (Math.random()-0.5)*18; fp[idx+2] = -2-Math.random()*7; }
+    if (fp[idx] > 10) fp[idx] = -10;
+    if (fp[idx] < -10) fp[idx] = 10;
+  }
+  floatPts.geometry.attributes.position.needsUpdate = true;
+  floatMat.opacity = 0.45 + Math.sin(t*1.3)*0.1;
+
+  const f2p = float2Pts.geometry.attributes.position.array;
+  for (let i = 0; i < float2Data.length; i++) {
+    const idx = i*3, d = float2Data[i];
+    f2p[idx+1] += d.vy;
+    f2p[idx] += d.vx + Math.sin(t*d.swaySpeed+d.swayPhase)*d.swayAmp*0.003;
+    if (f2p[idx+1] > 10) { f2p[idx+1] = -10; f2p[idx] = (Math.random()-0.5)*22; }
+    if (f2p[idx] > 12) f2p[idx] = -12;
+    if (f2p[idx] < -12) f2p[idx] = 12;
+  }
+  float2Pts.geometry.attributes.position.needsUpdate = true;
+  float2Mat.opacity = 0.22 + Math.sin(t*1.7+1)*0.08;
+
+  // ── Falling Petals ──
+  const pp = petalPts.geometry.attributes.position.array;
+  for (let i = 0; i < petalData.length; i++) {
+    const idx = i * 3;
+    const d = petalData[i];
+    pp[idx + 1] -= d.fallSpeed;
+    pp[idx] += d.xDrift + Math.sin(t * d.swaySpeed + d.swayPhase) * d.swayAmp * 0.003;
+    // Wrap around
+    if (pp[idx + 1] < -8) {
+      pp[idx + 1] = 8;
+      pp[idx] = (Math.random() - 0.5) * 16;
+      pp[idx + 2] = -1 - Math.random() * 3;
+    }
+    if (pp[idx] > 9) pp[idx] = -9;
+    if (pp[idx] < -9) pp[idx] = 9;
+  }
+  petalPts.geometry.attributes.position.needsUpdate = true;
+  petalMat.opacity = 0.45 + Math.sin(t * 1.2) * 0.08;
+
+  const p2p = petal2Pts.geometry.attributes.position.array;
+  for (let i = 0; i < petal2Data.length; i++) {
+    const idx = i * 3;
+    const d = petal2Data[i];
+    p2p[idx + 1] -= d.fallSpeed;
+    p2p[idx] += d.xDrift + Math.sin(t * d.swaySpeed + d.swayPhase) * d.swayAmp * 0.002;
+    if (p2p[idx + 1] < -9) {
+      p2p[idx + 1] = 9;
+      p2p[idx] = (Math.random() - 0.5) * 20;
+      p2p[idx + 2] = -2 - Math.random() * 5;
+    }
+    if (p2p[idx] > 11) p2p[idx] = -11;
+    if (p2p[idx] < -11) p2p[idx] = 11;
+  }
+  petal2Pts.geometry.attributes.position.needsUpdate = true;
+  petal2Mat.opacity = 0.25 + Math.sin(t * 1.5 + 1) * 0.06;
+
+  // ── Lit Particles ──
+  const lp = litPts.geometry.attributes.position.array;
+  for (let i = 0; i < litData.length; i++) {
+    const idx = i*3, d = litData[i];
+    lp[idx+1] += d.vy;
+    lp[idx] += d.vx + Math.sin(t*1.5+d.phase)*0.0008;
+    if (lp[idx+1] > 6) lp[idx+1] = -6;
+    if (lp[idx+1] < -6) lp[idx+1] = 6;
+    if (lp[idx] > 6) lp[idx] = -6;
+    if (lp[idx] < -6) lp[idx] = 6;
+  }
+  litPts.geometry.attributes.position.needsUpdate = true;
+
+  // ── Twinkle ──
+  twMat.opacity = 0.5 + Math.sin(t*3.5)*0.3;
+  twMat.size = 0.03 + Math.sin(t*2.8)*0.015;
+
+  // ── Star Rotation ──
+  starGroup.rotation.y += 0.0002;
+  starGroup.rotation.x += 0.0001;
+
+  // ── Camera ──
+  camera.position.x += (mx*0.6 - camera.position.x)*0.015;
+  camera.position.y += (-my*0.35 - camera.position.y)*0.015;
+  camera.lookAt(0, 0.1, 0);
+
+  // ── Bloom ──
+  bloomPass.strength = 0.6 + breathCurve * 0.12;
+
+  composer.render();
+}
+
+// ═══════════════════════════════════════
+// Resize
+// ═══════════════════════════════════════
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+
+// ═══════════════════════════════════════
+// Start
+// ═══════════════════════════════════════
+animate();
+</script>
+</body>
+</html>
